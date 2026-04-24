@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Demo Context Tối Ưu OpenClaw + Qwen</title>
+    <link rel="stylesheet" href="/static/style.css?v=20260424h" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero ask-hero">
+        <p class="eyebrow">Luồng context tối ưu · Mô phỏng local · Không dùng key thật</p>
+        <h1>Đặt câu hỏi cho Qwen qua gói context OpenClaw đã được tinh gọn.</h1>
+        <p class="hero-copy">
+          Demo này giúp bạn so sánh trực tiếp nhánh optimized và nhánh raw trên cùng một prompt,
+          để thấy ảnh hưởng của context bloat tới độ ổn định và khả năng trả lời.
+        </p>
+
+        <form id="askForm" class="ask-form">
+          <label class="prompt-lab" for="promptInput">
+            <span>Câu hỏi / tác vụ</span>
+            <textarea
+              id="promptInput"
+              rows="7"
+              placeholder="Nhập một câu hỏi thực tế cho OpenClaw + Qwen..."
+            ></textarea>
+          </label>
+          <p id="formError" class="form-error" role="alert"></p>
+          <div class="actions">
+            <button id="askButton" type="submit">Chạy So Sánh Thực Tế</button>
+          </div>
+        </form>
+
+        <div class="examples" aria-label="example prompts">
+          <p>Thử prompt mẫu:</p>
+          <button type="button" class="example-prompt">Phân tích luồng thực thi của OpenClaw và chỉ ra nơi context bị phình to.</button>
+          <button type="button" class="example-prompt">Tóm tắt cách giảm token bị inject trong agent runtime bằng prompt gọn, memory dạng pointer và summary.</button>
+          <button type="button" class="example-prompt">Giải thích vì sao Qwen có context dài vẫn có thể mất ổn định nếu framework agent inject quá nhiều context dư thừa.</button>
+        </div>
+      </section>
+
+      <section class="verdict-banner">
+        <p id="verdictText">Nhập prompt rồi bấm chạy để so sánh hai nhánh trên cùng một tác vụ.</p>
+      </section>
+
+      <section class="compare-scoreboard">
+        <div class="score-header metric-name">Chỉ số</div>
+        <div class="score-header score-opt">Có dùng cách giải quyết</div>
+        <div class="score-header score-raw">Không dùng cách giải quyết</div>
+
+        <div class="metric-name">Trạng thái</div>
+        <div id="cmpStatusOpt" class="score-cell score-opt">Chưa chạy</div>
+        <div id="cmpStatusRaw" class="score-cell score-raw">Chưa chạy</div>
+
+        <div class="metric-name">Token ước tính</div>
+        <div id="cmpTokensOpt" class="score-cell score-opt">--</div>
+        <div id="cmpTokensRaw" class="score-cell score-raw">--</div>
+
+        <div class="metric-name">Injected context</div>
+        <div id="cmpInjectedOpt" class="score-cell score-opt">--</div>
+        <div id="cmpInjectedRaw" class="score-cell score-raw">--</div>
+
+        <div class="metric-name">Độ trễ runtime</div>
+        <div id="cmpLatencyOpt" class="score-cell score-opt">--</div>
+        <div id="cmpLatencyRaw" class="score-cell score-raw">--</div>
+
+        <div class="metric-name">Rủi ro crash</div>
+        <div id="cmpRiskOpt" class="score-cell score-opt">--</div>
+        <div id="cmpRiskRaw" class="score-cell score-raw">--</div>
+
+        <div class="metric-name">Khả năng trả lời ổn định</div>
+        <div id="cmpStableOpt" class="score-cell score-opt">--</div>
+        <div id="cmpStableRaw" class="score-cell score-raw">--</div>
+      </section>
+
+      <section class="compare-grid">
+        <section id="answerPanel" class="answer-panel optimized-panel is-empty">
+          <div class="panel-title">
+            <p>Luồng đã tối ưu</p>
+            <h2>Kết quả trả lời</h2>
+          </div>
+          <div id="stabilityBadge" class="stability-badge neutral-badge">Chưa chạy</div>
+          <div class="prompt-echo">
+            <span>Prompt của người dùng</span>
+            <p id="promptEcho">Hãy gửi một prompt để chạy demo context tối ưu.</p>
+          </div>
+          <div id="answerText" class="answer-text">
+            Câu trả lời sẽ xuất hiện tại đây sau khi hệ thống chạy xong nhánh optimized.
+          </div>
+          <p id="answerNote" class="answer-note">Ghi chú về request optimized sẽ xuất hiện tại đây.</p>
+        </section>
+
+        <section class="raw-contrast side-panel raw-panel">
+          <div class="panel-title">
+            <p>Luồng không tối ưu</p>
+            <h2>Nếu không dùng cách giải quyết</h2>
+          </div>
+          <div id="rawBadge" class="stability-badge neutral-badge">Chưa chạy</div>
+          <div class="prompt-echo raw-run-card">
+            <span>Kết quả chạy thực tế</span>
+            <p id="rawRuntimeNote">Khi chạy, panel này sẽ hiện câu trả lời thực tế hoặc lỗi thực tế của nhánh raw.</p>
+          </div>
+          <div id="rawAnswerText" class="answer-text raw-answer-text">
+            Chưa có kết quả raw.
+          </div>
+          <div id="rawContrast" class="metrics">
+            <div><span>Trạng thái</span><strong>Chưa chạy</strong></div>
+            <div><span>Nhận định</span><strong>Nhập prompt để xem nhánh raw phản ứng ra sao.</strong></div>
+          </div>
+        </section>
+      </section>
+
+      <details id="detailsPanel" class="stability-details">
+        <summary>Chi tiết độ ổn định</summary>
+        <div class="details-grid">
+          <article>
+            <h3>Chỉ số tối ưu</h3>
+            <div id="metricsList" class="metrics"></div>
+          </article>
+          <article>
+            <h3>Các tối ưu đã áp dụng</h3>
+            <ul id="optimizationList" class="pipeline"></ul>
+          </article>
+        </div>
+        <article class="context-card">
+          <h3>Chi tiết luồng xử lý</h3>
+          <div id="pathDetails" class="metrics"></div>
+        </article>
+        <article class="context-card">
+          <h3>Checklist chứng minh</h3>
+          <ul id="proofChecklist" class="pipeline"></ul>
+        </article>
+        <article class="context-card">
+          <h3>Xem trước context đã nén gọn</h3>
+          <pre id="contextPreview">Chạy demo để xem gói context tối ưu.</pre>
+        </article>
+      </details>
+    </main>
+
+    <script src="/static/app.js?v=20260424h"></script>
+  </body>
+</html>
