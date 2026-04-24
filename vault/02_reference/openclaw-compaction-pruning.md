@@ -1,26 +1,11 @@
-# OpenClaw Compaction and Pruning
+Compaction converts long history into a short durable summary.
+Pruning removes low-value context before the next model call.
 
-Compaction converts long histories into compact state. Pruning removes
-irrelevant or stale context before a model call.
+In practice:
+- keep only the active goal
+- keep only the latest decision
+- keep only the unresolved risk
+- trim head/tail of long noisy outputs
+- hand large tool output to a sub-agent and keep the summary
 
-An optimized OpenClaw-style runtime should maintain explicit budgets for:
-
-- identity and operating rules
-- active task
-- retrieved knowledge
-- tool descriptions
-- memory
-- sub-agent outputs
-- response space
-
-The optimization flow is:
-
-1. Minimize SOUL / AGENTS / MEMORY / TOOLS.
-2. Store long references in a vault.
-3. Retrieve focused excerpts only.
-4. Require sub-agent summaries.
-5. Prune stale or low-priority sections.
-6. Compact prior work into a short handoff.
-
-This keeps the model call stable even when the underlying model advertises a
-large context window.
+This is how an OpenClaw-style runtime stays far below the dangerous prompt size zone.

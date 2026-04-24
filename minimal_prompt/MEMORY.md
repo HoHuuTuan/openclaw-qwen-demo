@@ -1,7 +1,4 @@
-# Minimal MEMORY
-
-Store pointers only:
-
-- objective_pointer: prove usable agent context is smaller than model window
-- vault_pointer: use `vault/` for long docs, notes, and playbooks
-- state_pointer: latest decision and current risk only
+Active memory keeps pointers only:
+- qwen strategy -> vault/01_thinking/qwen-openclaw-context-strategy.md
+- vllm deploy -> vault/02_reference/qwen-vllm-deploy.md
+- compaction/pruning -> vault/02_reference/openclaw-compaction-pruning.md

@@ -1,129 +1,151 @@
-# OpenClaw + Qwen Stable Context Demo
+# OpenClaw + Qwen 120k Context Optimization Demo
 
-Local demo for this product message:
+## Problem Statement
 
-`The optimization solution prevents Qwen-side overload/crash risk by reducing OpenClaw context bloat enough for realistic prompts to complete successfully.`
+Có key Qwen 120k nhưng khi cắm vào OpenClaw thì crash phía Qwen.
 
-The app does not use real API keys, does not call Qwen, and does not require the
-real OpenClaw runtime. It simulates optimized OpenClaw-style context
-construction, then returns a useful answer plus secondary stability details.
+Demo này được làm để trình bày cách giải quyết bài toán đó ngay cả khi:
+- chưa có Qwen key thật
+- không muốn phụ thuộc OpenClaw runtime thật
+- cần một demo local ổn định trên Windows
 
-## Main Flow
+Mặc định demo chạy bằng mock mode. Nếu máy có Ollama thì có thể bật `USE_OLLAMA=true`, nhưng nếu Ollama lỗi thì hệ thống vẫn fallback về mock để demo không fail.
 
-1. User enters a realistic OpenClaw/Qwen task.
-2. Backend builds an optimized context package.
-3. Backend sends the optimized package through the Qwen-facing adapter.
-4. UI shows the answer as the main output.
-5. A collapsible `Stability details` panel shows estimated tokens, latency,
-   crash-risk level, compacted context preview, and optimization steps.
+## Root Cause
 
-If `QWEN_API_BASE_URL` is configured, `/api/ask` uses the HTTP adapter. If not,
-the adapter falls back to a local mock answer so the demo still runs offline.
-The old comparison endpoints remain available for experimentation, but the main
-demo is now prompt-to-answer through the optimized Qwen path.
+OpenClaw inject quá nhiều context mỗi turn.
 
-## Run Local
+Trong OpenClaw-style agent runtime, usable context luôn nhỏ hơn model window vì mỗi lượt gọi model còn phải gánh:
+- `SOUL.md`
+- `AGENTS.md`
+- `MEMORY.md`
+- `TOOLS.md`
+- history
+- tool outputs
+- logs/search results
 
-```bash
-cd openclaw-qwen-demo
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r backend/requirements.txt
-uvicorn backend.server:app --reload --host 127.0.0.1 --port 8000
-```
+Raw context injection làm backend Qwen dễ crash, timeout hoặc treo trong giai đoạn prefill.
 
-Open:
+## Solution
+
+Demo này bám theo tinh thần của `openclaw-optimization-guide`:
+- minimal prompt files
+- vault
+- sub-agent summary
+- pruning
+- compaction
+
+Ý tưởng cốt lõi:
+- thu nhỏ injected files
+- chuyển knowledge dài sang `vault/`
+- dùng sub-agent để gom tool output lớn thành summary
+- prune context bằng head/tail trimming
+- compact history thành summary ngắn
+
+Kết quả là payload gửi tới model backend nhỏ hơn rất nhiều và không còn ở vùng crash risk như raw mode.
+
+## Repo Structure
 
 ```text
-http://127.0.0.1:8000
+openclaw-qwen-demo/
+  README.md
+  Dockerfile
+  docker-compose.yml
+  backend/
+    server.py
+    optimize.py
+    fake_openclaw_pipeline.py
+    subagent.py
+    demo_data.py
+    model_client.py
+    qwen_client.py
+    requirements.txt
+  frontend/
+    index.html
+    app.js
+    style.css
+  config/
+    openclaw_demo_config.json
+  minimal_prompt/
+    SOUL.md
+    AGENTS.md
+    MEMORY.md
+    TOOLS.md
+  vault/
+    01_thinking/qwen-openclaw-context-strategy.md
+    02_reference/qwen-vllm-deploy.md
+    02_reference/openclaw-compaction-pruning.md
 ```
 
-## Run With Docker
+## API Endpoints
+
+- `GET /health`
+- `POST /demo/raw`
+- `POST /demo/optimized`
+- `POST /demo/subagent`
+- `GET /demo/vault`
+- `GET /demo/compare`
+
+## Cách Chạy Local
+
+```bash
+pip install -r backend/requirements.txt
+uvicorn backend.server:app --host 0.0.0.0 --port 3000
+```
+
+Mở:
+
+```text
+http://localhost:3000
+```
+
+## Cách Chạy Docker
 
 ```bash
 docker compose up --build
 ```
 
-Open:
+Mở:
 
 ```text
-http://127.0.0.1:8000
+http://localhost:3000
 ```
 
-## Primary API
+## Script Demo 3 Phút Cho Leader
 
-```http
-POST /api/ask
-Content-Type: application/json
+1. Mở trang demo và nói: "Bên này không dùng Qwen key thật, mock mode là mặc định để chứng minh giải pháp context optimization."
+2. Bấm `Run RAW mode` để cho leader thấy payload raw rất dài, token estimate lớn, latency cao, crash risk cao.
+3. Chỉ vào card giải thích rằng vấn đề không nằm ở model 120k trên giấy, mà nằm ở OpenClaw inject quá nhiều thứ mỗi turn.
+4. Bấm `Run Sub-agent simulation` để cho thấy tool output 80k-120k chars được gom còn vài trăm chars.
+5. Bấm `Show Vault strategy` để cho thấy `MEMORY.md` chỉ giữ pointer tới `vault/` thay vì dump full docs.
+6. Bấm `Run OPTIMIZED mode` để cho leader thấy before/after chars, token reduction, crash risk giảm và model response thành công.
+7. Chốt bằng bảng compare: "Qwen 120k không đồng nghĩa usable context là 120k. Cách giải quyết là giảm context pressure trước khi inference."
 
-{
-  "prompt": "Explain why a Qwen long-context setup can still become unstable if an agent framework injects too much redundant context."
-}
+## Optional Ollama Mode
+
+Mặc định hệ thống dùng mock response.
+
+Nếu muốn thử local model qua Ollama:
+
+```bash
+set USE_OLLAMA=true
+set OLLAMA_MODEL=qwen2.5:3b
+uvicorn backend.server:app --host 0.0.0.0 --port 3000
 ```
 
-Response shape:
+Hoặc với Docker:
 
-```json
-{
-  "status": "ok",
-  "prompt": "...",
-  "answer": "...",
-  "mode": "optimized-qwen-path",
-  "stable": true,
-  "metrics": {
-    "estimated_tokens": 409,
-    "crash_risk": "low",
-    "latency_estimate": 845,
-    "context_size_label": "optimized"
-  },
-  "context_preview": "...",
-  "optimization_applied": [
-    "minimal system prompt",
-    "compact AGENTS instructions",
-    "pointer-style memory references",
-    "summarized sub-agent context",
-    "pruned tools/context",
-    "removed repeated context blocks"
-  ],
-  "notes": "Request completed through optimized context path.",
-  "adapter": {
-    "provider": "mock-qwen-adapter",
-    "used_mock": true,
-    "real_qwen_enabled": false
-  }
-}
+```bash
+set USE_OLLAMA=true
+docker compose up --build
 ```
 
-## Where To Add Real Qwen Later
+Ứng dụng sẽ thử gọi:
+- `http://host.docker.internal:11434/api/generate`
+- `http://localhost:11434/api/generate`
 
-The optimized context is built in `backend/optimize.py`:
+Nếu Ollama fail thì tự fallback về mock mode.
 
-```text
-simulate_optimized()
-ask_with_optimized_context()
-```
+## Note
 
-The Qwen-facing adapter is in `backend/qwen_client.py`.
-
-To use a real Qwen-compatible endpoint, set:
-
-```text
-QWEN_API_BASE_URL=http://your-host/v1
-QWEN_API_KEY=optional-key
-QWEN_MODEL=qwen-model-name
-```
-
-`ask_with_optimized_context()` already routes through the adapter. If no base
-URL is configured, the adapter returns the mock fallback answer.
-
-## Secondary APIs
-
-These remain for technical comparison/debugging:
-
-```text
-GET /api/health
-GET /api/compare?prompt=...&mode=compare
-POST /api/compare
-GET /api/run/raw?prompt=...
-GET /api/run/optimized?prompt=...
-```
+Demo này không cần Qwen key thật; mock mode dùng để chứng minh giải pháp context optimization. Khi có Qwen key/vLLM backend thật, chỉ thay `model_client.py`.

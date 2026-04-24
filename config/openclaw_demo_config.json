@@ -1,31 +1,12 @@
 {
-  "demo_name": "openclaw-qwen-context-optimization",
-  "runtime": "local-simulation",
-  "uses_real_api_keys": false,
-  "uses_real_openclaw_runtime": false,
-  "model_context_window_tokens": 120000,
-  "safe_agent_runtime_budget_tokens": 36000,
-  "target_injected_context_kb": 8,
-  "optimization_checklist": [
-    "Thu gọn workspace files",
-    "Đẩy knowledge dài sang vault",
-    "Main Qwen chỉ làm orchestrator",
-    "Bật pruning mạnh",
-    "Bật compaction chủ động",
-    "Giảm tool spam",
-    "Cấu hình Qwen backend đúng long-context"
-  ],
-  "qwen_backend_recommendation": {
-    "max_model_len": 120000,
-    "rope_scaling": "YaRN or equivalent long-context scaling",
-    "rollout_strategy": "test tăng dần từ context nhỏ lên context lớn"
-  },
-  "modes": {
-    "raw": {
-      "description": "Simulates OpenClaw-style full context injection with high timeout/crash risk."
-    },
-    "optimized": {
-      "description": "Simulates minimal prompt, vault retrieval, sub-agent summary, pruning, and compaction."
-    }
-  }
+  "demo_name": "openclaw-qwen-demo",
+  "default_mode": "mock",
+  "optional_model_mode": "ollama",
+  "ollama_default_model": "qwen2.5:3b",
+  "target_port": 3000,
+  "notes": [
+    "Mock mode is the default and does not require any API key.",
+    "USE_OLLAMA=true enables local Ollama fallback, but the demo still falls back to mock if Ollama is unavailable.",
+    "The goal is to demonstrate context optimization strategy, not cloud model connectivity."
+  ]
 }

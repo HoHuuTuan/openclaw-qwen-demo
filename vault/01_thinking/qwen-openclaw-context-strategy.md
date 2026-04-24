@@ -1,21 +1,14 @@
-# Qwen + OpenClaw Context Strategy
+Qwen 120k context window is only the theoretical upper bound of the model.
 
-Qwen long-context models can expose large theoretical context windows, such as
-120k tokens. In an agent runtime, usable context is smaller because the runtime
-adds overhead before the user task reaches the model.
+Inside an OpenClaw-style runtime, the usable context is smaller because every turn may also carry:
+- prompt identity files
+- agent routing rules
+- memory blocks
+- tool specs
+- history
+- logs and search results
+- output budget
 
-Typical overhead includes SOUL/identity prompts, agent routing instructions,
-tool schemas, long-term memory, retrieved documents, prior turns, scratchpads,
-sub-agent outputs, safety wrappers, and reserved response tokens.
-
-The practical strategy is to treat context as a scarce runtime resource:
-
-- Keep SOUL, AGENTS, MEMORY, and TOOLS minimal.
-- Move long-lived knowledge into a vault.
-- Retrieve only task-relevant excerpts.
-- Require sub-agents to return summaries, not transcripts.
-- Prune stale context before each model call.
-- Compact completed work into short durable state.
-
-The goal is not to fill the 120k window. The goal is to stay far below the
-timeout and reliability cliff.
+The stable strategy is to treat context as scarce.
+Keep prompt files tiny, store long knowledge in vault documents, retrieve only short excerpts,
+and make sub-agents return summaries instead of full transcripts.

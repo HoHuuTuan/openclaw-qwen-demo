@@ -2,6 +2,8 @@ services:
   openclaw-qwen-demo:
     build: .
     ports:
-      - "8000:8000"
+      - "3000:3000"
     environment:
-      - PYTHONUNBUFFERED=1
+      PYTHONUNBUFFERED: "1"
+      USE_OLLAMA: "${USE_OLLAMA:-false}"
+      OLLAMA_MODEL: "${OLLAMA_MODEL:-qwen2.5:3b}"

@@ -1,8 +1,4 @@
-# Minimal TOOLS
-
-Expose only short tool summaries:
-
-- ask: optimized Qwen-facing demo request
-- compare: optional technical comparison
-
-Do not inject long tool docs or old tool outputs into the main session.
+shell: run a local command.
+search: retrieve focused text only.
+subagent: summarize large outputs.
+vault: read a specific reference file.

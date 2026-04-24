@@ -1,45 +1,45 @@
-"""Sub-agent simulation for the optimized demo path."""
+"""Sub-agent simulation for compressing large tool output."""
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
-
-from .demo_data import KNOWLEDGE_ARTICLES
 
 
 @dataclass(frozen=True)
-class SubAgentResult:
-    name: str
-    summary: str
-    source_paths: list[str]
-    original_chars: int
+class SubagentSummary:
+    raw_chars: int
     summary_chars: int
+    reduction_percent: int
+    raw_preview: str
+    summary: str
 
 
-def run_research_subagent(query: str) -> SubAgentResult:
-    """Return a concise summary instead of a full transcript.
-
-    This models the optimization-guide idea that sub-agents should shield the
-    main agent from bulky intermediate context.
-    """
-
-    source_paths = [article["path"] for article in KNOWLEDGE_ARTICLES]
-    original = "\n\n".join(article["body"].strip() for article in KNOWLEDGE_ARTICLES)
-
-    short_query = " ".join(query.split())[:180]
-    summary = (
-        f"Task focus: {short_query}. "
-        "Long context is theoretical capacity, not a safe runtime budget. "
-        "OpenClaw-style agents add prompt overhead from identity, tools, memory, "
-        "history, retrieved knowledge, and sub-agent transcripts. Keep core "
-        "prompts minimal, retrieve focused vault excerpts, prune stale context, "
-        "and compact prior work before each model call."
-    )
-
-    return SubAgentResult(
-        name="researcher",
+def summarize_large_output(tool_output: str) -> SubagentSummary:
+    stripped = " ".join(tool_output.split())
+    raw_chars = len(tool_output)
+    prompt_focus = ""
+    match = re.search(r"Prompt focus:\s*(.+?)\s*(?:\[search-result\]|\[tool-log\]|Repeated observation:)", tool_output, re.DOTALL)
+    if match:
+        prompt_focus = " ".join(match.group(1).split())[:180]
+    sentences = [
+        "Sub-agent summary:",
+        "The raw tool output was too large to keep in the main OpenClaw turn.",
+        "Most of the content repeated the same warning: long prompt scaffolding inflates prefill cost.",
+        "The actionable result is to keep minimal prompt files, move long notes to vault, and return only compact findings.",
+        "This summary is what the main orchestrator should keep instead of the full 80k-120k char transcript.",
+    ]
+    if prompt_focus:
+        sentences.append(f"Current prompt focus: {prompt_focus}.")
+    if raw_chars > 90_000:
+        sentences.append("The observed raw output was well into the danger zone for timeout and backend instability.")
+    summary = " ".join(sentences)
+    summary_chars = len(summary)
+    reduction = max(0, 100 - int(summary_chars / max(1, raw_chars) * 100))
+    return SubagentSummary(
+        raw_chars=raw_chars,
+        summary_chars=summary_chars,
+        reduction_percent=reduction,
+        raw_preview=stripped[:600],
         summary=summary,
-        source_paths=source_paths,
-        original_chars=len(original),
-        summary_chars=len(summary),
     )
