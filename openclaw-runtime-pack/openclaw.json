@@ -1,0 +1,40 @@
+{
+  "name": "openclaw-gemini-optimized-runtime-pack",
+  "description": "OpenClaw-style runtime pack using Gemini 2.5 Flash with optimized context strategy and no hardcoded API key.",
+  "provider": "google",
+  "model": "google/gemini-2.5-flash",
+  "env": {
+    "apiKey": {
+      "from": ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
+      "required": false,
+      "note": "Set GEMINI_API_KEY or GOOGLE_API_KEY in the environment. Do not hardcode keys in this file."
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "google/gemini-2.5-flash"
+      },
+      "timeoutSeconds": 120,
+      "skills": [],
+      "contextPruning": {
+        "enabled": true,
+        "maxPromptChars": 4000,
+        "headChars": 2000,
+        "tailChars": 2000,
+        "dropRawToolOutputs": true,
+        "preferVaultPointers": true
+      },
+      "compaction": {
+        "enabled": true,
+        "triggerAfterTurns": 6,
+        "retain": ["active_goal", "latest_decision", "open_risk"],
+        "maxSummaryChars": 1200
+      }
+    }
+  },
+  "notes": [
+    "Gemini is used as the live backend because Qwen key is not available in the current demo.",
+    "When Qwen is available, only swap provider/model. Keep the same optimized context strategy."
+  ]
+}

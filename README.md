@@ -1,38 +1,72 @@
 # OpenClaw + Gemini 2.5 Flash Optimized Context Demo
 
-## 1. Mục tiêu demo
+## Mục tiêu demo
 
-Repo này demo bản **đã apply fix** cho lỗi context overload trong OpenClaw-style runtime. Thay vì demo RAW vs OPTIMIZED, màn chính là live chat:
+Repo này demo bản đã apply fix cho lỗi context overload trong OpenClaw-style runtime.
 
-User question -> optimized OpenClaw-style prompt -> Gemini/mock answer -> no crash.
+Flow chính:
 
-Backend vẫn dựng một raw context nội bộ để đo before/after, nhưng chỉ gửi prompt đã tối ưu sang model.
+```text
+user question -> optimized OpenClaw-style context -> Gemini live answer -> low context budget / low crash risk
+```
 
-## 2. Vì sao không dùng Qwen key
+Gemini chỉ đóng vai trò live backend thay Qwen vì hiện chưa có Qwen key thật.
+Khi có Qwen key thật, chỉ thay provider/model. Context strategy giữ nguyên.
 
-Hiện tại chưa có Qwen key thật. Bài toán gốc là Qwen 120k context bị crash/timeout khi OpenClaw inject quá nhiều context. Demo này không gọi Qwen thật để tránh phụ thuộc key và tránh làm buổi demo fail.
+## Vì sao không dùng Qwen key
 
-## 3. Vì sao dùng Gemini 2.5 Flash free key
+Bài toán gốc là:
 
-Gemini 2.5 Flash được dùng như backend live thay thế để chứng minh pipeline chat ổn sau khi context đã được tối ưu. Gemini không phải trọng tâm. Trọng tâm là chiến lược minimal prompt, vault pointer, sub-agent summary, pruning và compaction.
+> Có key Qwen 120k nhưng khi cắm vào OpenClaw thì crash phía Qwen.
 
-## 4. Chạy không có key: mock mode
+Demo này không phụ thuộc Qwen key thật để tránh làm buổi demo fail vì quota, timeout hoặc backend không sẵn sàng.
 
-Không cần cấu hình gì. Nếu thiếu `GEMINI_API_KEY`, backend tự trả mock response. UI vẫn hiển thị context budget, reduction %, estimated tokens và crash risk.
+## Vì sao vẫn có thể crash dù window lớn
 
-## 5. Chạy có Gemini key
+Qwen 120k hoặc Gemini vẫn có thể crash nếu OpenClaw inject quá nhiều context mỗi turn:
+- `SOUL.md`
+- `AGENTS.md`
+- `MEMORY.md`
+- `TOOLS.md`
+- history
+- tool outputs
+- logs/search results
+
+Model window lớn không đồng nghĩa safe usable runtime budget cũng lớn như vậy.
+
+## Giải pháp
+
+Demo bám theo chiến lược:
+- minimal prompt files
+- vault pointers
+- sub-agent summary
+- pruning
+- compaction
+
+Backend vẫn build một raw context nội bộ để đo before/after, nhưng chỉ gửi optimized prompt sang Gemini hoặc mock fallback.
+
+## Mock fallback
+
+Nếu thiếu `GEMINI_API_KEY` hoặc Gemini API lỗi, backend tự fallback về mock.
+Demo không fail chỉ vì live backend không sẵn sàng.
+
+## Gemini live mode
 
 Windows PowerShell:
- 
+
 ```powershell
 setx GEMINI_API_KEY "YOUR_KEY"
 ```
 
-Sau đó mở terminal mới để biến môi trường có hiệu lực.
+Hoặc dùng:
 
-Backend giữ key ở server. Frontend không gọi Gemini trực tiếp và không bao giờ nhận key.
+```powershell
+setx GOOGLE_API_KEY "YOUR_KEY"
+```
 
-## 6. Cách chạy
+Mở terminal mới để env có hiệu lực.
+
+## Cách chạy
 
 ```powershell
 docker compose up --build
@@ -45,37 +79,35 @@ http://localhost:3000
 ```
 
 Endpoints chính:
-
 - `GET /health`
 - `POST /chat`
 - `GET /strategy`
 - `GET /config/openclaw`
 
-## 7. Script demo cho leader
+## Using this strategy in real OpenClaw
 
-“Em không demo raw overload nữa; em demo bản đã fix.”
+Web demo chứng minh pipeline tối ưu context.
 
-“Gemini chỉ thay Qwen để live chat.”
+Folder `openclaw-runtime-pack/` là bản áp dụng cùng chiến lược đó vào OpenClaw thật:
+- `openclaw-runtime-pack/openclaw.json`
+- `openclaw-runtime-pack/agent/SOUL.md`
+- `openclaw-runtime-pack/agent/AGENTS.md`
+- `openclaw-runtime-pack/agent/MEMORY.md`
+- `openclaw-runtime-pack/agent/TOOLS.md`
+- `openclaw-runtime-pack/agent/vault/...`
 
-“Chiến lược chính là minimal prompt, vault pointer, sub-agent summary, pruning, compaction.”
+Cách set Gemini key trên Windows PowerShell:
 
-“Backend build raw OpenClaw-style context để đo before, nhưng chỉ gửi optimized prompt sang model.”
-
-“Nếu Gemini hết quota hoặc chưa có key, mock fallback vẫn chạy để demo không fail.”
-
-## 8. Nếu leader hỏi “Qwen đâu?”
-
-“Khi có Qwen key, chỉ thay provider/model. Context optimization giữ nguyên.”
-
-## Cấu trúc chính
-
-```text
-backend/server.py        FastAPI endpoints
-backend/model_client.py  Gemini REST client + mock fallback
-backend/optimize.py      token estimate, pruning, compaction, reduction metrics
-backend/prompt_builder.py raw/optimized OpenClaw-style prompt builder
-frontend/                static chat UI
-minimal_prompt/          SOUL/AGENTS/MEMORY/TOOLS bản tối giản
-vault/                   ghi chú dài, chỉ trỏ bằng pointer
-config/                  ví dụ OpenClaw Gemini optimized config
+```powershell
+setx GEMINI_API_KEY "YOUR_KEY"
 ```
+
+Khi dùng Qwen thật:
+- chỉ thay provider/model trong `openclaw-runtime-pack/openclaw.json`
+- giữ nguyên context strategy
+
+## Script demo cho leader
+
+1. “Em không demo raw overload làm flow chính; em demo bản đã fix với Gemini live hoặc mock fallback.”
+2. “Gemini chỉ thay Qwen để live answer. Phần quan trọng là minimal prompt, vault pointer, sub-agent summary, pruning và compaction.”
+3. “Khi có Qwen key thật, chỉ thay model/provider trong runtime pack; chiến lược tối ưu context vẫn giữ nguyên.”

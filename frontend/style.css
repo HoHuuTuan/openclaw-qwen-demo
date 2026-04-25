@@ -245,6 +245,21 @@ button:disabled {
   line-height: 1.45;
 }
 
+.runtime-pack-card p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.runtime-pack-card code {
+  color: var(--accent-2);
+  font-weight: 800;
+}
+
+.runtime-pack-note {
+  margin-bottom: 0;
+  font-weight: 700;
+}
+
 .hidden {
   display: none;
 }

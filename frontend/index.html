@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>OpenClaw + Gemini 2.5 Flash Optimized Context Demo</title>
-    <link rel="stylesheet" href="/static/style.css?v=20260425b" />
+    <link rel="stylesheet" href="/static/style.css?v=20260425c" />
   </head>
   <body>
     <main class="page">
@@ -13,8 +13,8 @@
           <p class="eyebrow">Optimized runtime live chat</p>
           <h1>OpenClaw + Gemini 2.5 Flash Optimized Context Demo</h1>
           <p class="subtitle">
-            Gemini is used as live backend replacement because Qwen key is not available.
-            The solution being demonstrated is context optimization.
+            Gemini is used as the live backend replacement because Qwen key is not available.
+            The thing being proven here is the optimized context strategy.
           </p>
         </div>
         <div class="status-stack">
@@ -29,11 +29,18 @@
           <div id="messages" class="messages">
             <div class="message assistant">
               <strong>Demo ready.</strong>
-              <p>Nhập câu hỏi. Backend build OpenClaw-style context, tối ưu trước, rồi chỉ gửi prompt nhỏ sang Gemini 2.5 Flash hoặc mock fallback.</p>
+              <p>
+                Nhập câu hỏi. Backend build OpenClaw-style context, tối ưu trước,
+                rồi chỉ gửi prompt nhỏ sang Gemini 2.5 Flash hoặc mock fallback.
+              </p>
             </div>
           </div>
           <form id="chatForm" class="composer">
-            <textarea id="messageInput" rows="3" placeholder="Hỏi: Vì sao Qwen 120k vẫn crash khi OpenClaw inject quá nhiều context?"></textarea>
+            <textarea
+              id="messageInput"
+              rows="3"
+              placeholder="Hỏi: Vì sao Qwen 120k vẫn crash khi OpenClaw inject quá nhiều context?"
+            ></textarea>
             <button id="sendButton" type="submit">Send</button>
           </form>
         </article>
@@ -42,6 +49,18 @@
           <section id="warningBox" class="warning-box hidden">
             <strong>Warning</strong>
             <p id="warningText">Mock fallback because Gemini key is missing or failed.</p>
+          </section>
+
+          <section class="panel runtime-pack-card">
+            <p class="eyebrow">Runtime Pack</p>
+            <h2>OpenClaw runtime pack included</h2>
+            <p>
+              Repo đã kèm sẵn folder <code>openclaw-runtime-pack/</code> để mô phỏng cách áp dụng
+              cùng chiến lược context optimization vào OpenClaw thật.
+            </p>
+            <p class="runtime-pack-note">
+              Khi có Qwen key thật, chỉ thay provider/model trong runtime pack. Chiến lược giữ nguyên.
+            </p>
           </section>
 
           <section class="panel">
@@ -70,7 +89,7 @@
       <section class="why">
         <div>
           <p class="eyebrow">Why optimization matters</p>
-          <h2>Không demo raw overload nữa; demo bản đã apply fix.</h2>
+          <h2>Không demo raw overload làm flow chính; demo bản đã apply fix.</h2>
         </div>
         <p id="strategyText">
           Gemini replaces Qwen only for live backend demonstration. The context optimization strategy transfers to Qwen when Qwen key is available.
@@ -78,6 +97,6 @@
       </section>
     </main>
 
-    <script src="/static/app.js?v=20260425b"></script>
+    <script src="/static/app.js?v=20260425c"></script>
   </body>
 </html>
