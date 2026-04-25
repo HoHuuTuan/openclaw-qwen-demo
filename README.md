@@ -1,151 +1,81 @@
-# OpenClaw + Qwen 120k Context Optimization Demo
+# OpenClaw + Gemini 2.5 Flash Optimized Context Demo
 
-## Problem Statement
+## 1. Mục tiêu demo
 
-Có key Qwen 120k nhưng khi cắm vào OpenClaw thì crash phía Qwen.
+Repo này demo bản **đã apply fix** cho lỗi context overload trong OpenClaw-style runtime. Thay vì demo RAW vs OPTIMIZED, màn chính là live chat:
 
-Demo này được làm để trình bày cách giải quyết bài toán đó ngay cả khi:
-- chưa có Qwen key thật
-- không muốn phụ thuộc OpenClaw runtime thật
-- cần một demo local ổn định trên Windows
+User question -> optimized OpenClaw-style prompt -> Gemini/mock answer -> no crash.
 
-Mặc định demo chạy bằng mock mode. Nếu máy có Ollama thì có thể bật `USE_OLLAMA=true`, nhưng nếu Ollama lỗi thì hệ thống vẫn fallback về mock để demo không fail.
+Backend vẫn dựng một raw context nội bộ để đo before/after, nhưng chỉ gửi prompt đã tối ưu sang model.
 
-## Root Cause
+## 2. Vì sao không dùng Qwen key
 
-OpenClaw inject quá nhiều context mỗi turn.
+Hiện tại chưa có Qwen key thật. Bài toán gốc là Qwen 120k context bị crash/timeout khi OpenClaw inject quá nhiều context. Demo này không gọi Qwen thật để tránh phụ thuộc key và tránh làm buổi demo fail.
 
-Trong OpenClaw-style agent runtime, usable context luôn nhỏ hơn model window vì mỗi lượt gọi model còn phải gánh:
-- `SOUL.md`
-- `AGENTS.md`
-- `MEMORY.md`
-- `TOOLS.md`
-- history
-- tool outputs
-- logs/search results
+## 3. Vì sao dùng Gemini 2.5 Flash free key
 
-Raw context injection làm backend Qwen dễ crash, timeout hoặc treo trong giai đoạn prefill.
+Gemini 2.5 Flash được dùng như backend live thay thế để chứng minh pipeline chat ổn sau khi context đã được tối ưu. Gemini không phải trọng tâm. Trọng tâm là chiến lược minimal prompt, vault pointer, sub-agent summary, pruning và compaction.
 
-## Solution
+## 4. Chạy không có key: mock mode
 
-Demo này bám theo tinh thần của `openclaw-optimization-guide`:
-- minimal prompt files
-- vault
-- sub-agent summary
-- pruning
-- compaction
+Không cần cấu hình gì. Nếu thiếu `GEMINI_API_KEY`, backend tự trả mock response. UI vẫn hiển thị context budget, reduction %, estimated tokens và crash risk.
 
-Ý tưởng cốt lõi:
-- thu nhỏ injected files
-- chuyển knowledge dài sang `vault/`
-- dùng sub-agent để gom tool output lớn thành summary
-- prune context bằng head/tail trimming
-- compact history thành summary ngắn
+## 5. Chạy có Gemini key
 
-Kết quả là payload gửi tới model backend nhỏ hơn rất nhiều và không còn ở vùng crash risk như raw mode.
-
-## Repo Structure
-
-```text
-openclaw-qwen-demo/
-  README.md
-  Dockerfile
-  docker-compose.yml
-  backend/
-    server.py
-    optimize.py
-    fake_openclaw_pipeline.py
-    subagent.py
-    demo_data.py
-    model_client.py
-    qwen_client.py
-    requirements.txt
-  frontend/
-    index.html
-    app.js
-    style.css
-  config/
-    openclaw_demo_config.json
-  minimal_prompt/
-    SOUL.md
-    AGENTS.md
-    MEMORY.md
-    TOOLS.md
-  vault/
-    01_thinking/qwen-openclaw-context-strategy.md
-    02_reference/qwen-vllm-deploy.md
-    02_reference/openclaw-compaction-pruning.md
+Windows PowerShell:
+ 
+```powershell
+setx GEMINI_API_KEY "YOUR_KEY"
 ```
 
-## API Endpoints
+Sau đó mở terminal mới để biến môi trường có hiệu lực.
+
+Backend giữ key ở server. Frontend không gọi Gemini trực tiếp và không bao giờ nhận key.
+
+## 6. Cách chạy
+
+```powershell
+docker compose up --build
+```
+
+Mở:
+
+```text
+http://localhost:3000
+```
+
+Endpoints chính:
 
 - `GET /health`
-- `POST /demo/raw`
-- `POST /demo/optimized`
-- `POST /demo/subagent`
-- `GET /demo/vault`
-- `GET /demo/compare`
+- `POST /chat`
+- `GET /strategy`
+- `GET /config/openclaw`
 
-## Cách Chạy Local
+## 7. Script demo cho leader
 
-```bash
-pip install -r backend/requirements.txt
-uvicorn backend.server:app --host 0.0.0.0 --port 3000
-```
+“Em không demo raw overload nữa; em demo bản đã fix.”
 
-Mở:
+“Gemini chỉ thay Qwen để live chat.”
 
-```text
-http://localhost:3000
-```
+“Chiến lược chính là minimal prompt, vault pointer, sub-agent summary, pruning, compaction.”
 
-## Cách Chạy Docker
+“Backend build raw OpenClaw-style context để đo before, nhưng chỉ gửi optimized prompt sang model.”
 
-```bash
-docker compose up --build
-```
+“Nếu Gemini hết quota hoặc chưa có key, mock fallback vẫn chạy để demo không fail.”
 
-Mở:
+## 8. Nếu leader hỏi “Qwen đâu?”
+
+“Khi có Qwen key, chỉ thay provider/model. Context optimization giữ nguyên.”
+
+## Cấu trúc chính
 
 ```text
-http://localhost:3000
+backend/server.py        FastAPI endpoints
+backend/model_client.py  Gemini REST client + mock fallback
+backend/optimize.py      token estimate, pruning, compaction, reduction metrics
+backend/prompt_builder.py raw/optimized OpenClaw-style prompt builder
+frontend/                static chat UI
+minimal_prompt/          SOUL/AGENTS/MEMORY/TOOLS bản tối giản
+vault/                   ghi chú dài, chỉ trỏ bằng pointer
+config/                  ví dụ OpenClaw Gemini optimized config
 ```
-
-## Script Demo 3 Phút Cho Leader
-
-1. Mở trang demo và nói: "Bên này không dùng Qwen key thật, mock mode là mặc định để chứng minh giải pháp context optimization."
-2. Bấm `Run RAW mode` để cho leader thấy payload raw rất dài, token estimate lớn, latency cao, crash risk cao.
-3. Chỉ vào card giải thích rằng vấn đề không nằm ở model 120k trên giấy, mà nằm ở OpenClaw inject quá nhiều thứ mỗi turn.
-4. Bấm `Run Sub-agent simulation` để cho thấy tool output 80k-120k chars được gom còn vài trăm chars.
-5. Bấm `Show Vault strategy` để cho thấy `MEMORY.md` chỉ giữ pointer tới `vault/` thay vì dump full docs.
-6. Bấm `Run OPTIMIZED mode` để cho leader thấy before/after chars, token reduction, crash risk giảm và model response thành công.
-7. Chốt bằng bảng compare: "Qwen 120k không đồng nghĩa usable context là 120k. Cách giải quyết là giảm context pressure trước khi inference."
-
-## Optional Ollama Mode
-
-Mặc định hệ thống dùng mock response.
-
-Nếu muốn thử local model qua Ollama:
-
-```bash
-set USE_OLLAMA=true
-set OLLAMA_MODEL=qwen2.5:3b
-uvicorn backend.server:app --host 0.0.0.0 --port 3000
-```
-
-Hoặc với Docker:
-
-```bash
-set USE_OLLAMA=true
-docker compose up --build
-```
-
-Ứng dụng sẽ thử gọi:
-- `http://host.docker.internal:11434/api/generate`
-- `http://localhost:11434/api/generate`
-
-Nếu Ollama fail thì tự fallback về mock mode.
-
-## Note
-
-Demo này không cần Qwen key thật; mock mode dùng để chứng minh giải pháp context optimization. Khi có Qwen key/vLLM backend thật, chỉ thay `model_client.py`.

@@ -1,69 +1,75 @@
-"""Model client with mock-by-default behavior and optional Ollama fallback."""
+"""Gemini 2.5 Flash client with safe mock fallback."""
 
 from __future__ import annotations
 
-import hashlib
-import json
 import os
-import re
 from typing import Any
-from urllib import error, request
-
-from .demo_data import MOCK_MODEL_RESPONSES
 
 
-def mock_generate(prompt: str) -> dict[str, Any]:
-    normalized = " ".join(prompt.split())
-    digest = int(hashlib.md5(normalized.encode("utf-8")).hexdigest()[:8], 16)
-    template = MOCK_MODEL_RESPONSES[digest % len(MOCK_MODEL_RESPONSES)]
-    task_match = re.search(r"##\s*task\s+(.+?)(?:\s+## |\Z)", prompt, re.DOTALL | re.IGNORECASE)
-    task_text = " ".join(task_match.group(1).split()) if task_match else normalized
-    excerpt = task_text[:180] + ("..." if len(task_text) > 180 else "")
+GEMINI_MODEL = "gemini-2.5-flash"
+MOCK_MODEL = "mock-optimized-context"
+MISSING_KEY_WARNING = "GEMINI_API_KEY/GOOGLE_API_KEY is missing; using mock fallback."
+
+
+def get_gemini_api_key() -> str | None:
+    """Prefer GEMINI_API_KEY, then GOOGLE_API_KEY."""
+    return os.getenv("GEMINI_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip() or None
+
+
+def has_gemini_key() -> bool:
+    return get_gemini_api_key() is not None
+
+
+def active_provider() -> str:
+    return "gemini" if has_gemini_key() else "mock"
+
+
+def active_model() -> str:
+    return GEMINI_MODEL if has_gemini_key() else MOCK_MODEL
+
+
+def _safe_error_message(exc: Exception) -> str:
+    message = str(exc) or type(exc).__name__
+    api_key = get_gemini_api_key()
+    if api_key:
+        message = message.replace(api_key, "[redacted]")
+    return message[:300]
+
+
+def _mock_answer(warning: str) -> dict[str, Any]:
     return {
+        "answer": (
+            "Mock fallback only. Add GEMINI_API_KEY to enable Gemini live mode. "
+            "The optimized-context pipeline still ran: minimal prompt files, vault pointers, "
+            "sub-agent summary, pruning, and compaction were applied before the mock response."
+        ),
         "provider": "mock",
+        "model": MOCK_MODEL,
         "used_mock": True,
-        "response": f"{template}\n\nPrompt đang hỏi: {excerpt}",
+        "warning": warning,
     }
 
 
-def _ollama_urls() -> list[str]:
-    explicit = os.getenv("OLLAMA_URL", "").strip()
-    if explicit:
-        return [explicit]
-    return [
-        "http://host.docker.internal:11434/api/generate",
-        "http://localhost:11434/api/generate",
-    ]
+def generate_answer(prompt: str) -> dict[str, Any]:
+    api_key = get_gemini_api_key()
+    if not api_key:
+        return _mock_answer(MISSING_KEY_WARNING)
 
+    try:
+        from google import genai
 
-def generate_response(prompt: str) -> dict[str, Any]:
-    if os.getenv("USE_OLLAMA", "").lower() != "true":
-        return mock_generate(prompt)
-
-    payload = {
-        "model": os.getenv("OLLAMA_MODEL", "qwen2.5:3b"),
-        "prompt": prompt,
-        "stream": False,
-    }
-    body = json.dumps(payload).encode("utf-8")
-    headers = {"Content-Type": "application/json"}
-
-    for url in _ollama_urls():
-        req = request.Request(url=url, data=body, headers=headers, method="POST")
-        try:
-            with request.urlopen(req, timeout=25) as response:
-                raw = json.loads(response.read().decode("utf-8"))
-        except (error.URLError, error.HTTPError, TimeoutError, json.JSONDecodeError):
-            continue
-
-        text = str(raw.get("response", "")).strip()
-        if text:
-            return {
-                "provider": "ollama",
-                "used_mock": False,
-                "response": text,
-            }
-
-    fallback = mock_generate(prompt)
-    fallback["provider"] = "mock-fallback-after-ollama-error"
-    return fallback
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
+        answer = (response.text or "").strip()
+        if not answer:
+            raise RuntimeError("Gemini returned an empty response.")
+        return {
+            "answer": answer,
+            "provider": "gemini",
+            "model": GEMINI_MODEL,
+            "used_mock": False,
+            "warning": None,
+        }
+    except Exception as exc:  # noqa: BLE001 - demo must never crash if Gemini fails.
+        safe_message = _safe_error_message(exc)
+        return _mock_answer(f"Gemini API failed: {safe_message}")

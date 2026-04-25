@@ -1,5 +1,5 @@
 Decision tree:
-1. If tool output is large, send it to a sub-agent and keep only the summary.
-2. If long knowledge is needed, read the vault and inject only short excerpts.
-3. If history grows, compact it before the next model call.
-4. Keep the main orchestrator prompt minimal at all times.
+1. Compact when context grows.
+2. Summarize large tool output before main model calls.
+3. Use vault pointers instead of injecting long documents.
+4. Answer concisely with the smallest useful context.

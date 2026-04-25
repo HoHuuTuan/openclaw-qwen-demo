@@ -1,14 +1,7 @@
-Qwen 120k context window is only the theoretical upper bound of the model.
+# Qwen OpenClaw Context Strategy
 
-Inside an OpenClaw-style runtime, the usable context is smaller because every turn may also carry:
-- prompt identity files
-- agent routing rules
-- memory blocks
-- tool specs
-- history
-- logs and search results
-- output budget
+Qwen 120k has a large advertised context window, but an OpenClaw runtime can still crash or time out when it injects too much material every turn.
 
-The stable strategy is to treat context as scarce.
-Keep prompt files tiny, store long knowledge in vault documents, retrieve only short excerpts,
-and make sub-agents return summaries instead of full transcripts.
+The problem is context bloat: long SOUL/AGENTS/MEMORY/TOOLS files, uncompressed history, raw tool output, search logs, and copied vault documents all add prefill cost. The model limit is not the only limit. Runtime latency, gateway timeout, memory pressure, and provider quotas can fail before the theoretical window is reached.
+
+The fix is to keep the working prompt small from the start. Minimal prompt files stay injected. Long knowledge remains in vault. MEMORY.md stores pointers. Large tool output is summarized by a sub-agent. History is compacted. Low value context is pruned before the backend call.

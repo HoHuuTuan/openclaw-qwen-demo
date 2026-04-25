@@ -1,4 +1,4 @@
-shell: run a local command.
-search: retrieve focused text only.
-subagent: summarize large outputs.
-vault: read a specific reference file.
+search: retrieve only needed facts.
+subagent: summarize large output.
+vault: keep long knowledge outside the prompt.
+compact: shrink history before model calls.

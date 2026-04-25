@@ -1,0 +1,43 @@
+{
+  "name": "openclaw-gemini-optimized-runtime",
+  "models": {
+    "primary": {
+      "provider": "google",
+      "model": "google/gemini-2.5-flash",
+      "apiKeyEnv": "GEMINI_API_KEY",
+      "fallbackApiKeyEnv": "GOOGLE_API_KEY"
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": "primary",
+      "timeoutSeconds": 120,
+      "skills": [],
+      "contextPruning": {
+        "enabled": true,
+        "strategy": "keep-minimal-active-context",
+        "maxPromptChars": 12000,
+        "dropRawToolOutput": true,
+        "preferVaultPointers": true
+      },
+      "compaction": {
+        "enabled": true,
+        "triggerChars": 16000,
+        "targetChars": 3500,
+        "preserve": [
+          "current user task",
+          "decisions",
+          "constraints",
+          "vault pointers",
+          "sub-agent summaries"
+        ]
+      }
+    }
+  },
+  "promptFiles": {
+    "soul": "minimal_prompt/SOUL.md",
+    "agents": "minimal_prompt/AGENTS.md",
+    "memory": "minimal_prompt/MEMORY.md",
+    "tools": "minimal_prompt/TOOLS.md"
+  }
+}
